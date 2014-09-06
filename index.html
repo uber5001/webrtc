@@ -1,0 +1,54 @@
+<!-- video A views the user's camera directly -->
+<video id="videoA" autoplay></video>
+<!-- video B views the user's camera through an RTC connection -->
+<video id="videoB" autoplay></video>
+<script>
+	//polyfills
+	var RTCPeerConnection = RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
+	navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+	
+	//request & load user's stream into videoA
+	navigator.getUserMedia({video: true}, function(stream) {
+		videoA.src = URL.createObjectURL(stream);
+	
+		//set up the "local" connection, connectionA
+		var connectionA = new RTCPeerConnection(null);
+		connectionA.onicecandidate = function(event) {
+			//give A's ICE candidate to B
+			if (event.candidate)
+				connectionB.addIceCandidate(new RTCIceCandidate(event.candidate));
+		};
+		
+		//set up the "remote" connection, connectionB
+		var connectionB = new RTCPeerConnection(null);
+		connectionB.onicecandidate = function(event) {
+			//give B's ICE candidate to A
+			if (event.candidate)
+				connectionA.addIceCandidate(new RTCIceCandidate(event.candidate));
+		};
+		connectionB.onaddstream = function(event) {
+			//after connection is made, load the stream into videoB
+			videoB.src = URL.createObjectURL(event.stream);
+		};
+		
+		//set the data sent by connectionA to be the user's video.
+		connectionA.addStream(stream);
+		
+		//exchange of SDP, started with an offer
+		connectionA.createOffer(function(descriptionA) {
+			//this begins generation of ICE candidates for A:
+			connectionA.setLocalDescription(descriptionA);
+			//and describes them to B
+			connectionB.setRemoteDescription(descriptionA);
+			//exchange of SDP, finished with an answer
+			connectionB.createAnswer(function(descriptionB) {
+				//this begins generation of ICE candidates for B:
+				connectionB.setLocalDescription(descriptionB);
+				//and describes them to A
+				connectionA.setRemoteDescription(descriptionB);
+			});
+		});
+		
+	}, function(error) {console.log('failure:', error);});
+	
+</script>
