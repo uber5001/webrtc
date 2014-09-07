@@ -13,6 +13,8 @@
 		localVideo.src = URL.createObjectURL(stream);
 		connect.disabled = false;
 		connect.onclick = function() {
+			connect.disabled = true;
+			server.disabled = true;
 			var socket = new WebSocket(server.value);
 			socket.onmessage = function(event) {
 				var message = JSON.parse(event.data);
