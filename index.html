@@ -5,12 +5,15 @@
 <input id="connect" disabled type="button" value="connect">
 <script>
 	//polyfills
-	var RTCPeerConnection = RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
+	var RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+	var RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
+	var RTCIceCandidate = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
 	navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 	
 	//request & load user's stream into videoA
 	navigator.getUserMedia({video: true}, function(stream) {
 		localVideo.src = URL.createObjectURL(stream);
+		server.disabled = false; //because https://bugzilla.mozilla.org/show_bug.cgi?id=685657
 		connect.disabled = false;
 		connect.onclick = function() {
 			connect.disabled = true;
@@ -21,30 +24,31 @@
 				switch (message.type) {
 					case 'SDP_Stage_1':
 						peerConnection.createOffer(function(offerDescription) {
-							peerConnection.setLocalDescription(offerDescription);
-							console.log(JSON.stringify(offerDescription));
-							socket.send(JSON.stringify({
-								type: 'offer',
-								data: offerDescription
-							}));
-						});
+							peerConnection.setLocalDescription(offerDescription, function() {								
+								socket.send(JSON.stringify({
+									type: 'offer',
+									data: offerDescription
+								}));
+							}, errorHandler);
+						}, errorHandler);
 						break;
 					case 'SDP_Stage_2':
-						peerConnection.setRemoteDescription(new RTCSessionDescription(message.data));
-						peerConnection.createAnswer(function(answerDescription) {
-							peerConnection.setLocalDescription(answerDescription);
-							socket.send(JSON.stringify({
-								type: 'answer',
-								data: answerDescription
-							}));
-						});
+						peerConnection.setRemoteDescription(new RTCSessionDescription(message.data), function() {
+							peerConnection.createAnswer(function(answerDescription) {
+								peerConnection.setLocalDescription(answerDescription, function() {								
+									socket.send(JSON.stringify({
+										type: 'answer',
+										data: answerDescription
+									}));
+								}, errorHandler);
+							}, errorHandler);
+						}, errorHandler);
 						break;
 					case 'SDP_Stage_3':
-						peerConnection.setRemoteDescription(new RTCSessionDescription(message.data));
+						peerConnection.setRemoteDescription(new RTCSessionDescription(message.data), successHandler, errorHandler);
 						break;
 					case 'ice':
-						console.log(message.data);
-						peerConnection.addIceCandidate(new RTCIceCandidate(message.data));
+						peerConnection.addIceCandidate(new RTCIceCandidate(message.data), successHandler, errorHandler);
 						break;
 				}
 			}
@@ -53,7 +57,6 @@
 				'iceServers': [{'url': 'stun:stun.l.google.com:19302'}]
 			});
 			peerConnection.onicecandidate = function(event) {
-				console.log(JSON.stringify(event.candidate));
 				if (event.candidate)
 					socket.send(JSON.stringify({
 						type: 'ice',
@@ -67,6 +70,13 @@
 			
 			peerConnection.addStream(stream);
 		};
-	}, function(error) {console.log('failure:', error);});
+	}, errorHandler);
 	
+	function errorHandler() {
+		console.log(arguments);
+	}
+	
+	function successHandler() {
+		console.log(arguments);
+	}
 </script>
