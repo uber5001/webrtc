@@ -1,0 +1,70 @@
+<video id="localVideo" autoplay></video>
+<video id="remoteVideo" autoplay></video>
+<br>
+<input type="text" id="server" value="ws://localhost:8765">
+<input id="connect" disabled type="button" value="connect">
+<script>
+	//polyfills
+	var RTCPeerConnection = RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
+	navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+	
+	//request & load user's stream into videoA
+	navigator.getUserMedia({video: true}, function(stream) {
+		localVideo.src = URL.createObjectURL(stream);
+		connect.disabled = false;
+		connect.onclick = function() {
+			var socket = new WebSocket(server.value);
+			socket.onmessage = function(event) {
+				var message = JSON.parse(event.data);
+				switch (message.type) {
+					case 'SDP_Stage_1':
+						peerConnection.createOffer(function(offerDescription) {
+							peerConnection.setLocalDescription(offerDescription);
+							console.log(JSON.stringify(offerDescription));
+							socket.send(JSON.stringify({
+								type: 'offer',
+								data: offerDescription
+							}));
+						});
+						break;
+					case 'SDP_Stage_2':
+						peerConnection.setRemoteDescription(new RTCSessionDescription(message.data));
+						peerConnection.createAnswer(function(answerDescription) {
+							peerConnection.setLocalDescription(answerDescription);
+							socket.send(JSON.stringify({
+								type: 'answer',
+								data: answerDescription
+							}));
+						});
+						break;
+					case 'SDP_Stage_3':
+						peerConnection.setRemoteDescription(new RTCSessionDescription(message.data));
+						break;
+					case 'ice':
+						console.log(message.data);
+						peerConnection.addIceCandidate(new RTCIceCandidate(message.data));
+						break;
+				}
+			}
+			
+			var peerConnection = new RTCPeerConnection({
+				'iceServers': [{'url': 'stun:stun.l.google.com:19302'}]
+			});
+			peerConnection.onicecandidate = function(event) {
+				console.log(JSON.stringify(event.candidate));
+				if (event.candidate)
+					socket.send(JSON.stringify({
+						type: 'ice',
+						data: event.candidate
+					}));
+			};
+			
+			peerConnection.onaddstream = function(event) {
+				remoteVideo.src = URL.createObjectURL(event.stream);
+			};
+			
+			peerConnection.addStream(stream);
+		};
+	}, function(error) {console.log('failure:', error);});
+	
+</script>

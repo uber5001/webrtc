@@ -2,10 +2,10 @@ var WebSocket = require('ws');
 
 var server = new WebSocket.Server({port: 8765});
 
-var unpairedSocket = undefined;
+var unpairedSocket = null;
 
 server.on('connection', function(socket) {
-	if (unpairedSocket) {
+	if (unpairedSocket != null) {
 		pair(unpairedSocket, socket);
 		unpariedSocket = undefined;
 	} else {
@@ -15,7 +15,7 @@ server.on('connection', function(socket) {
 
 function pair(socketA, socketB) {
 	//stage 1, ask A for offer.
-	socketA.sendMessage(JSON.stringify({
+	socketA.send(JSON.stringify({
 		type: 'SDP_Stage_1'
 	}));
 	socketA.on('message', function(message) {
@@ -23,14 +23,14 @@ function pair(socketA, socketB) {
 		switch (message.type) {
 			case 'offer':
 				//stage 2, give B A's offer; ask B for answer
-				socketB.sendMessage(JSON.stringify({
+				socketB.send(JSON.stringify({
 					type: 'SDP_Stage_2',
 					data: message.data
 				}));
 				break;
 			case 'ice':
 				//relay all ice messages
-				socketB.sendMessage(JSON.stringify({
+				socketB.send(JSON.stringify({
 					type: 'ice',
 					data: message.data
 				}));
@@ -42,14 +42,14 @@ function pair(socketA, socketB) {
 		switch (message.type) {
 			case 'answer':
 				//stage 3, give A B's answer.
-				socketA.sendMessage(JSON.stringify({
+				socketA.send(JSON.stringify({
 					type: 'SDP_Stage_3',
 					data: message.data
 				}));
 				break;
 			case 'ice':
 				//relay all ice messages
-				socketA.sendMessage(JSON.stringify({
+				socketA.send(JSON.stringify({
 					type: 'ice',
 					data: message.data
 				}));
