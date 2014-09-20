@@ -4,6 +4,7 @@ var server = new WebSocket.Server({port: 8765});
 
 var unpairedSocket = null;
 
+//whenever 2 valid connections exist, call pair() on them
 server.on('connection', function(socket) {
 	console.log('connection received');
 	if (unpairedSocket != null) {
@@ -22,6 +23,7 @@ server.on('connection', function(socket) {
 	}
 });
 
+//given two active connections, connection them together with RTC
 function pair(socketA, socketB) {
 	//stage 1, ask A for offer.
 	try {
