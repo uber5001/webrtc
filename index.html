@@ -2,6 +2,7 @@
 <video id="remoteVideo" autoplay></video>
 <br>
 <input type="text" id="server" value="ws://localhost:8765">
+<input type="text" id="turn" value="stun:stun.l.google.com:19302">
 <input id="connect" disabled type="button" value="connect">
 <script>
 	//polyfills
@@ -54,7 +55,7 @@
 			}
 			
 			var peerConnection = new RTCPeerConnection({
-				'iceServers': [{'url': 'stun:stun.l.google.com:19302'}]
+				'iceServers': [{'url': turn.value}]
 			});
 			peerConnection.onicecandidate = function(event) {
 				if (event.candidate)
